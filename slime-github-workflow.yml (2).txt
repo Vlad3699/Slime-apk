@@ -1,0 +1,47 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '**.gd'
+      - '**.tscn'
+      - 'project.godot'
+      - 'export_presets.cfg'
+      - 'icon.png'
+      - 'assets/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix git ownership
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Create debug keystore
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          ls -l ~/.android/debug.keystore
+
+      - name: Import project
+        run: godot --headless --path . --import
+
+      - name: Export APK (debug)
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-debug "Android" build/Slime-debug.apk
+          ls -lh build/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Slime-apk
+          path: build/*.apk
